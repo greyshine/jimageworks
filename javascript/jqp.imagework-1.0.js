@@ -10,6 +10,8 @@
  * 
  * Basically the image is replaced by a canvas including the image.
  * 
+ * Settings on align and crop are defaulting to the ones directly decalred at top of this script.
+ * 
  * @param $ jQuery itself
  */
 (function($) {
@@ -17,28 +19,17 @@
 	var alignDefaults = {
 		lineColor : '#000',
 		canvasBackgroundColor : '#FFF',
-		callbackAngleSelect : function(image, x1, y1, x2, y2, degrees) {
-		},
-		callbackPosition1 : function(image, x, y) {
-		},
-		callbackPosition2 : function(image, x1, y1, x2, y2, degrees) {
-		},
+		callbackAngleSelect : function(image, x1, y1, x2, y2, degrees) {},
+		callbackPosition1 : function(image, x, y) {},
+		callbackPosition2 : function(image, x1, y1, x2, y2, degrees) {},
 		testCanvasId:null
 	};
 
 	var cropDefaults = {
-		callbackPositionSearch : function(image, x1, y1, x2, y2) {
-			//console.log('ps: '+ x1+'x'+y1 +' / '+x2+'x'+y2 );
-		},
-		callbackPosition1 : function(image, x, y) {
-			//console.log('p1');
-		},
-		callbackPosition2 : function(image, x1, y1, x2, y2) {
-			//console.log('p2');
-		},
-		callbackCropped : function(image, x1, y1, x2, y2) {
-			//console.log('cropped');
-		},
+		callbackPositionSearch : function(image, x1, y1, x2, y2) {},
+		callbackPosition1 : function(image, x, y) {},
+		callbackPosition2 : function(image, x1, y1, x2, y2) {},
+		callbackCropped : function(image, x1, y1, x2, y2) {},
 		testCanvasId:null
 	};
 
@@ -322,38 +313,64 @@
 		var settings = Object.assign({}, alignDefaults, inSettings);
 
 		var calculateOuterBox = function(w, h, rotation) {
+			
+			if ( typeof w != 'number' ) { return {}; }
+			if ( typeof h != 'number' ) { return {}; }
+			if ( typeof rotation != 'number' ) { return {}; }
+			
+			var l = '> r='+ rotation +', wxh='+ w + 'x'+ h +'\n';
 
+			rotation = Math.abs( rotation ); 
+			
 			while (rotation >= 360) {
 				rotation -= 360;
 			}
-			while (rotation < 0) {
-				rotation += 360;
+			
+			switch (rotation) {
+			
+			case 0:
+			case 180:
+				return {
+					x : w,
+					y : h,
+					toString:function() { return this.x+'x'+this.y; }
+				}
+			case 90:
+			case 270:
+				return {
+					x : h,
+					y : w,
+					toString:function() { return this.x+'x'+this.y; }
+				};
+			case 45:
+			case 135:
+				return {
+					x : Math.sqrt( (w*w)+(h*h) ),
+					y : this.x,
+					toString:function() { return this.x+'x'+this.y; }
+				};
 			}
-
-			if (rotation == 0 || rotation == 180) {
-				return;
+			
+			
+			var calc = function(c,deg) {
+				var beta = 90-deg;
+				beta = beta / (180 / Math.PI);
+				var a = c * Math.cos( beta ) ;
+				a = Math.abs(a);
+				var b = Math.sqrt( (c*c)-(a*a) );
+				return {
+					a:a, b:b
+				};
 			}
-			if (rotation == 90 || rotation == 270) {
-				var t = canvas.width;
-				canvas.width = canvas.height;
-				canvas.height = t;
-				return;
-			}
-
-			var beta = rotation;
-			var alpha = 90 - beta;
-
+			
 			var c1 = w, c2 = h;
-
-			var a1 = c1 * Math.cos(beta);
-			var b1 = Math.sqrt((c1 * c1) - (a1 * a1));
-
-			var a2 = c2 * Math.cos(beta);
-			var b2 = Math.sqrt((c2 * c2) - (a2 * a2));
-
-			var w2 = a2 + b1;
-			var h2 = a1 + b2;
-
+			
+			var calc1 = calc( c1, rotation );
+			var calc2 = calc( c2, rotation );
+			
+			var w2 = calc1.b + calc2.a;
+			var h2 = calc1.a + calc2.b;
+			
 			return {
 				x : w2,
 				y : h2,
@@ -379,10 +396,12 @@
 			
 			var q = getQuadrant( xy1, xy2 );
 			
+			var aa = alpha;
+			
 			if ( q == 1 || q == 3 ) {
 				alpha *= -1;
 			}
-
+			
 			return alpha;
 		};
 
@@ -416,6 +435,19 @@
 			ctx.rotate(rotation * Math.PI / 180);
 			ctx.drawImage(image, -image.width / 2, -image.height / 2);
 			ctx.restore();
+			
+			var c2 = document.getElementById('tc2');
+			c2.width  = Math.sqrt((w * w) + (h * h));
+			c2.height = c2.width; 
+			ctx2 = c2.getContext('2d');
+			
+			ctx2.save();
+			ctx2.clearRect(0, 0, tc.width, tc.height);
+			ctx2.translate(c2.width / 2, c2.height / 2);
+			ctx2.rotate(rotation * Math.PI / 180);
+			ctx2.drawImage(image, -image.width / 2, -image.height / 2);
+			ctx2.restore();
+			
 		};
 
 		for (var i = 0, l = this.length; i < l; i++) {
